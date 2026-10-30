@@ -1,0 +1,11 @@
+project,title,assignee,due_date,importance,effort
+Course portal,Write grading rules page,Nadia,2026-11-10,4,3
+Course portal,Add password reset email,Omar,2026-11-12,3,2
+Club website,Collect member photos,Hana,2026-11-15,2,2
+Club website,Publish event calendar,Youssef,2026-11-08,4,2
+Mobile app,Draft onboarding screens,Nadia,2026-11-18,3,4
+Mobile app,Set up crash reporting,Omar,2026-11-09,5,2
+Research lab,Clean survey data,Hana,2026-11-11,4,3
+Research lab,Write methods section,Youssef,2026-11-20,3,5
+Ghost project,Task for a project that does not exist,Nadia,2026-11-14,3,3
+Course portal,Task with invalid importance,Omar,2026-11-16,7,2

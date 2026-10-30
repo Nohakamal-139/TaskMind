@@ -1,0 +1,18 @@
+# never commit these
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.db
+*.db-journal
+secret.key
+local_settings.json
