@@ -11,8 +11,8 @@ waiting on unfinished prerequisites are marked as Blocked.
 |---|---|---|
 | Member 1 | _(Asma)_ | Architecture & database: structure, `schema.sql`, repositories, transactions, seed data, integration |
 | Member 2 | _(Noha)_ | Algorithms & business logic (`algorithms/`, `services/`) |
-| Member 3 | _(name)_ | GUI: main window, four screens |
-| Member 4 | _(name)_ | Analytics, import/export, tests, packaging |
+| Member 3 | _(Nada & Reem)_ | GUI: main window, four screens |
+| Member 4 | _(Hana)_ | Analytics, import/export, tests, packaging |
 
 ## Features (status)
 | ID | Feature | Status |
