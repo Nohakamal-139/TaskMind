@@ -1,5 +1,3 @@
-from datetime import date, timedelta
-
 from PyQt6.QtCore import Qt, QDate, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
@@ -23,6 +21,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app.services.mock_data_service import load_mock_data
+
 
 STATUS_COLORS = {
     "Completed": "#16D6C1",
@@ -38,8 +38,12 @@ PRIORITY_COLORS = {
     "Low": "#16D6C1",
 }
 
+BLOCKED_COLOR = "#7C3AED"
+
 
 class TaskFormDialog(QDialog):
+    """نافذة إضافة أو تعديل مهمة واختيار اعتمادياتها."""
+
     def __init__(self, projects, tasks, current_task=None, parent=None):
         super().__init__(parent)
 
@@ -47,9 +51,14 @@ class TaskFormDialog(QDialog):
         self.current_task = current_task
 
         self.setWindowTitle("Edit Task" if current_task else "Add New Task")
-        self.setMinimumWidth(420)
+        self.setMinimumWidth(430)
 
         layout = QVBoxLayout(self)
+
+        title = QLabel("Edit Task" if current_task else "Add New Task")
+        title.setStyleSheet("font-size: 18pt; font-weight: 700;")
+        layout.addWidget(title)
+
         form = QFormLayout()
 
         self.name_input = QLineEdit()
@@ -82,9 +91,12 @@ class TaskFormDialog(QDialog):
         form.addRow("Due date", self.due_input)
         layout.addLayout(form)
 
-        layout.addWidget(QLabel("Dependencies (optional)"))
+        dependencies_title = QLabel("Dependencies (optional)")
+        dependencies_title.setStyleSheet("font-weight: 700; margin-top: 8px;")
+        layout.addWidget(dependencies_title)
 
         self.dependencies_list = QListWidget()
+
         current_id = current_task["id"] if current_task else None
         current_dependencies = (
             set(current_task.get("dependencies", []))
@@ -113,7 +125,7 @@ class TaskFormDialog(QDialog):
 
         cancel_button = QPushButton("Cancel")
         save_button = QPushButton("Save")
-        save_button.setDefault(True)
+        save_button.setObjectName("Primary")
 
         cancel_button.clicked.connect(self.reject)
         save_button.clicked.connect(self.save_task)
@@ -128,9 +140,9 @@ class TaskFormDialog(QDialog):
             self.priority_input.setCurrentText(current_task["priority"])
             self.status_input.setCurrentText(current_task["status"])
 
-            task_date = QDate.fromString(current_task["due"], "yyyy-MM-dd")
-            if task_date.isValid():
-                self.due_input.setDate(task_date)
+            parsed_date = QDate.fromString(current_task["due"], "yyyy-MM-dd")
+            if parsed_date.isValid():
+                self.due_input.setDate(parsed_date)
 
     def save_task(self):
         if not self.name_input.text().strip():
@@ -148,10 +160,9 @@ class TaskFormDialog(QDialog):
 
         for index in range(self.dependencies_list.count()):
             item = self.dependencies_list.item(index)
+
             if item.checkState() == Qt.CheckState.Checked:
-                dependencies.append(
-                    item.data(Qt.ItemDataRole.UserRole)
-                )
+                dependencies.append(item.data(Qt.ItemDataRole.UserRole))
 
         return {
             "name": self.name_input.text().strip(),
@@ -164,21 +175,89 @@ class TaskFormDialog(QDialog):
 
 
 class ProjectsTasksScreen(QWidget):
+    """الشاشة الثانية: جدول المهام والبحث والفلاتر والإجراءات."""
+
     tasks_changed = pyqtSignal(list)
 
     def __init__(self, tasks=None, projects=None, parent=None):
         super().__init__(parent)
 
-        self.tasks = tasks if tasks is not None else []
-        self.projects = projects if projects else ["My Project"]
+        if tasks is None or projects is None:
+            mock_tasks, mock_projects = load_mock_data()
+            tasks = mock_tasks if tasks is None else tasks
+            projects = mock_projects if projects is None else projects
+
+        self.tasks = tasks
+        self.projects = projects
 
         self._build_ui()
         self.refresh_table()
 
     def _build_ui(self):
+        self.setStyleSheet("""
+            QWidget {
+                color: #F1F5F9;
+                font-family: Segoe UI;
+                font-size: 10pt;
+            }
+
+            QLineEdit, QComboBox, QDateEdit {
+                background: #081B31;
+                color: #F1F5F9;
+                border: 2px solid #2C5B80;
+                border-radius: 7px;
+                padding: 8px;
+            }
+
+            QPushButton {
+                background: #10243D;
+                color: #DCEBFA;
+                border: 2px solid #2C5B80;
+                border-radius: 8px;
+                padding: 8px 12px;
+            }
+
+            QPushButton:hover {
+                background: #2C5B80;
+                border-color: #20C9D8;
+            }
+
+            QPushButton#Primary {
+                background: #2583E8;
+                color: white;
+                border-color: #2583E8;
+            }
+
+            QTableWidget {
+                background: #081B31;
+                alternate-background-color: #0B213A;
+                color: #E7F0FA;
+                border: 2px solid #2C5B80;
+                gridline-color: #2C5B80;
+                selection-background-color: #164A78;
+            }
+
+            QHeaderView::section {
+                background: #10243D;
+                color: #8FCBFF;
+                border: none;
+                border-bottom: 1px solid #2C5B80;
+                padding: 10px 6px;
+                font-weight: 700;
+            }
+
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+            }
+        """)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
+
+        heading = QHBoxLayout()
+        title_box = QVBoxLayout()
 
         title = QLabel("Projects & Tasks")
         title.setStyleSheet("font-size: 22pt; font-weight: 700;")
@@ -188,22 +267,24 @@ class ProjectsTasksScreen(QWidget):
         )
         subtitle.setStyleSheet("color: #94A3B8;")
 
-        heading = QHBoxLayout()
-        title_box = QVBoxLayout()
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
         heading.addLayout(title_box)
         heading.addStretch()
 
         add_button = QPushButton("+  Add Task")
+        add_button.setObjectName("Primary")
         add_button.clicked.connect(self.add_task)
         heading.addWidget(add_button)
+
         layout.addLayout(heading)
 
-        filters = QHBoxLayout()
+        filter_row = QHBoxLayout()
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search by task or project...")
+        self.search_input.setPlaceholderText(
+            "Search by task or project..."
+        )
         self.search_input.textChanged.connect(self.refresh_table)
 
         self.project_filter = QComboBox()
@@ -224,40 +305,64 @@ class ProjectsTasksScreen(QWidget):
         clear_button = QPushButton("Clear")
         clear_button.clicked.connect(self.clear_filters)
 
-        filters.addWidget(self.search_input, 3)
-        filters.addWidget(self.project_filter, 1)
-        filters.addWidget(self.status_filter, 1)
-        filters.addWidget(clear_button)
-        layout.addLayout(filters)
+        filter_row.addWidget(self.search_input, 3)
+        filter_row.addWidget(self.project_filter, 1)
+        filter_row.addWidget(self.status_filter, 1)
+        filter_row.addWidget(clear_button)
 
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels([
+        layout.addLayout(filter_row)
+
+        self.tasks_table = QTableWidget(0, 8)
+        self.tasks_table.setHorizontalHeaderLabels([
             "Task Name",
             "Project",
             "Status",
             "Priority",
             "Due Date",
             "Dependencies",
+            "Dependency Status",
             "Actions",
         ])
-        self.table.setAlternatingRowColors(True)
-        self.table.setShowGrid(True)
-        self.table.verticalHeader().setVisible(False)
-        self.table.verticalHeader().setDefaultSectionSize(44)
-        self.table.setSelectionBehavior(
+
+        self.tasks_table.setAlternatingRowColors(True)
+        self.tasks_table.setShowGrid(True)
+        self.tasks_table.verticalHeader().setVisible(False)
+        self.tasks_table.verticalHeader().setDefaultSectionSize(44)
+        self.tasks_table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
-        self.table.setEditTriggers(
+        self.tasks_table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
-        self.table.horizontalHeader().setSectionResizeMode(
+        self.tasks_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
         )
 
-        layout.addWidget(self.table, 1)
+        layout.addWidget(self.tasks_table, 1)
+
+    def get_blockers(self, task):
+        if task["status"] == "Completed":
+            return []
+
+        tasks_by_id = {
+            item["id"]: item
+            for item in self.tasks
+        }
+
+        blockers = []
+
+        for dependency_id in task.get("dependencies", []):
+            dependency = tasks_by_id.get(dependency_id)
+
+            if dependency is None:
+                blockers.append(f"Missing task #{dependency_id}")
+            elif dependency["status"] != "Completed":
+                blockers.append(dependency["name"])
+
+        return blockers
 
     def refresh_table(self):
-        search = self.search_input.text().strip().lower()
+        search = self.search_input.text().strip().casefold()
         selected_project = self.project_filter.currentText()
         selected_status = self.status_filter.currentText()
 
@@ -265,8 +370,8 @@ class ProjectsTasksScreen(QWidget):
 
         for task in self.tasks:
             if search and (
-                search not in task["name"].lower()
-                and search not in task["project"].lower()
+                search not in task["name"].casefold()
+                and search not in task["project"].casefold()
             ):
                 continue
 
@@ -284,19 +389,18 @@ class ProjectsTasksScreen(QWidget):
 
             visible_tasks.append(task)
 
-        self.table.setRowCount(len(visible_tasks))
+        self.tasks_table.setRowCount(len(visible_tasks))
 
         for row, task in enumerate(visible_tasks):
+            tasks_by_id = {
+                item["id"]: item
+                for item in self.tasks
+            }
+
             dependency_names = []
 
             for dependency_id in task.get("dependencies", []):
-                dependency = next(
-                    (
-                        item for item in self.tasks
-                        if item["id"] == dependency_id
-                    ),
-                    None,
-                )
+                dependency = tasks_by_id.get(dependency_id)
                 if dependency:
                     dependency_names.append(dependency["name"])
 
@@ -321,16 +425,34 @@ class ProjectsTasksScreen(QWidget):
                         QColor(PRIORITY_COLORS.get(task["priority"], "#F1F5F9"))
                     )
 
-                self.table.setItem(row, column, item)
+                self.tasks_table.setItem(row, column, item)
+
+            blockers = self.get_blockers(task)
+
+            badge = QTableWidgetItem("Blocked" if blockers else "—")
+            badge.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            if blockers:
+                badge.setForeground(QColor("#FFFFFF"))
+                badge.setBackground(QColor(BLOCKED_COLOR))
+                badge.setToolTip(
+                    "Blocked: waiting for " + ", ".join(blockers)
+                )
+            else:
+                badge.setToolTip(
+                    "This task has no unfinished dependencies."
+                )
+
+            self.tasks_table.setItem(row, 6, badge)
 
             actions = QWidget()
             actions_layout = QHBoxLayout(actions)
-            actions_layout.setContentsMargins(4, 2, 4, 2)
+            actions_layout.setContentsMargins(3, 2, 3, 2)
 
-            complete_checkbox = QCheckBox()
-            complete_checkbox.setToolTip("Mark task as completed")
-            complete_checkbox.setChecked(task["status"] == "Completed")
-            complete_checkbox.toggled.connect(
+            done_checkbox = QCheckBox()
+            done_checkbox.setToolTip("Mark task as completed")
+            done_checkbox.setChecked(task["status"] == "Completed")
+            done_checkbox.toggled.connect(
                 lambda checked, task_id=task["id"]:
                     self.set_task_completed(task_id, checked)
             )
@@ -347,11 +469,45 @@ class ProjectsTasksScreen(QWidget):
                     self.delete_task(task_id)
             )
 
-            actions_layout.addWidget(complete_checkbox)
+            actions_layout.addWidget(done_checkbox)
             actions_layout.addWidget(edit_button)
             actions_layout.addWidget(delete_button)
 
-            self.table.setCellWidget(row, 6, actions)
+            self.tasks_table.setCellWidget(row, 7, actions)
+
+    def dependencies_create_cycle(self, task_id, proposed_dependencies):
+        """يتحقق إذا كانت الاعتماديات الجديدة ستنشئ دورة."""
+        graph = {
+            task["id"]: list(task.get("dependencies", []))
+            for task in self.tasks
+        }
+        graph[task_id] = list(proposed_dependencies)
+
+        visiting = set()
+        visited = set()
+
+        def visit(node):
+            if node in visiting:
+                return True
+
+            if node in visited:
+                return False
+
+            visiting.add(node)
+
+            for dependency_id in graph.get(node, []):
+                if dependency_id in graph and visit(dependency_id):
+                    return True
+
+            visiting.remove(node)
+            visited.add(node)
+            return False
+
+        return any(
+            visit(node)
+            for node in graph
+            if node not in visited
+        )
 
     def add_task(self):
         dialog = TaskFormDialog(
@@ -360,22 +516,36 @@ class ProjectsTasksScreen(QWidget):
             parent=self,
         )
 
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            task = dialog.get_data()
-            task["id"] = max(
-                (item["id"] for item in self.tasks),
-                default=0,
-            ) + 1
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
 
-            self.tasks.append(task)
-            self._notify_tasks_changed()
+        data = dialog.get_data()
+        data["id"] = max(
+            (task["id"] for task in self.tasks),
+            default=0,
+        ) + 1
+
+        if self.dependencies_create_cycle(
+            data["id"],
+            data["dependencies"],
+        ):
+            QMessageBox.warning(
+                self,
+                "Invalid dependencies",
+                "These dependencies create a cycle. "
+                "Please choose another dependency.",
+            )
+            return
+
+        self.tasks.append(data)
+        self._tasks_updated()
 
     def edit_task(self, task_id):
         task = next(
             (item for item in self.tasks if item["id"] == task_id),
             None,
         )
-        if not task:
+        if task is None:
             return
 
         dialog = TaskFormDialog(
@@ -385,16 +555,51 @@ class ProjectsTasksScreen(QWidget):
             parent=self,
         )
 
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            task.update(dialog.get_data())
-            self._notify_tasks_changed()
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        data = dialog.get_data()
+
+        if task_id in data["dependencies"]:
+            QMessageBox.warning(
+                self,
+                "Invalid dependency",
+                "A task cannot depend on itself.",
+            )
+            return
+
+        if self.dependencies_create_cycle(
+            task_id,
+            data["dependencies"],
+        ):
+            QMessageBox.warning(
+                self,
+                "Invalid dependencies",
+                "These dependencies create a cycle. "
+                "Please choose another dependency.",
+            )
+            return
+
+        task.update(data)
+        self._tasks_updated()
+
+    def set_task_completed(self, task_id, completed):
+        task = next(
+            (item for item in self.tasks if item["id"] == task_id),
+            None,
+        )
+        if task is None:
+            return
+
+        task["status"] = "Completed" if completed else "Not Started"
+        self._tasks_updated()
 
     def delete_task(self, task_id):
         task = next(
             (item for item in self.tasks if item["id"] == task_id),
             None,
         )
-        if not task:
+        if task is None:
             return
 
         answer = QMessageBox.question(
@@ -405,31 +610,22 @@ class ProjectsTasksScreen(QWidget):
             | QMessageBox.StandardButton.No,
         )
 
-        if answer == QMessageBox.StandardButton.Yes:
-            self.tasks = [
-                item for item in self.tasks
-                if item["id"] != task_id
-            ]
-
-            for item in self.tasks:
-                item["dependencies"] = [
-                    dependency
-                    for dependency in item.get("dependencies", [])
-                    if dependency != task_id
-                ]
-
-            self._notify_tasks_changed()
-
-    def set_task_completed(self, task_id, completed):
-        task = next(
-            (item for item in self.tasks if item["id"] == task_id),
-            None,
-        )
-        if not task:
+        if answer != QMessageBox.StandardButton.Yes:
             return
 
-        task["status"] = "Completed" if completed else "Not Started"
-        self._notify_tasks_changed()
+        self.tasks = [
+            item for item in self.tasks
+            if item["id"] != task_id
+        ]
+
+        for item in self.tasks:
+            item["dependencies"] = [
+                dependency_id
+                for dependency_id in item.get("dependencies", [])
+                if dependency_id != task_id
+            ]
+
+        self._tasks_updated()
 
     def clear_filters(self):
         self.search_input.clear()
@@ -437,6 +633,6 @@ class ProjectsTasksScreen(QWidget):
         self.status_filter.setCurrentIndex(0)
         self.refresh_table()
 
-    def _notify_tasks_changed(self):
+    def _tasks_updated(self):
         self.refresh_table()
         self.tasks_changed.emit(self.tasks)
