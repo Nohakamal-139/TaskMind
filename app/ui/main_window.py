@@ -9,6 +9,12 @@ from pathlib import Path
 
 from PyQt6.QtCore import Qt, QDate, QSettings, QStringListModel
 from PyQt6.QtGui import QFont, QPixmap
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from app.services.mock_data_service import load_mock_data
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QLabel, QPushButton,
     QVBoxLayout, QHBoxLayout, QGridLayout, QStackedWidget, QTableWidget,
@@ -181,17 +187,6 @@ PRIORITY_COLORS = {
 }
 
 
-def make_task(task_id, name, project, status, priority, due, dependencies=None):
-    return {
-        "id": task_id,
-        "name": name,
-        "project": project,
-        "status": status,
-        "priority": priority,
-        "due": due,
-        "dependencies": dependencies or []
-    }
-
 
 class TaskDialog(QDialog):
     """نافذة إضافة/تعديل مهمة مع اختيار الاعتماديات."""
@@ -305,19 +300,8 @@ class MainWindow(QMainWindow):
         self.pending_add_after_login = False
         self.page_before_auth = 0
 
-        today = date.today()
-        self.tasks = [
-            make_task(1, "Design the database schema", "AI Assistant", "In Progress", "High", today.isoformat()),
-            make_task(2, "Implement login API", "Web Platform", "Pending", "Medium", (today + timedelta(days=1)).isoformat(), [1]),
-            make_task(3, "Create UI mockups", "Mobile App", "Completed", "Medium", (today + timedelta(days=2)).isoformat()),
-            make_task(4, "Write test cases", "Task Manager", "In Progress", "Low", (today + timedelta(days=3)).isoformat(), [2]),
-            make_task(5, "Prepare project presentation", "Final Project", "Pending", "High", (today + timedelta(days=5)).isoformat()),
-            make_task(6, "Fix bugs in authentication", "Web Platform", "Overdue", "High", (today - timedelta(days=2)).isoformat(), [2]),
-            make_task(7, "Update documentation", "AI Assistant", "Pending", "Low", (today + timedelta(days=4)).isoformat(), [1]),
-            make_task(8, "Deploy to production", "Mobile App", "Not Started", "Medium", (today + timedelta(days=7)).isoformat(), [3, 4]),
-        ]
-        self.next_id = 9
-        self.projects = ["AI Assistant", "Web Platform", "Mobile App", "Task Manager", "Final Project"]
+        self.tasks, self.projects = load_mock_data()
+        self.next_id = max((task["id"] for task in self.tasks), default=0) + 1
 
         self.nav_buttons = []
         self.stack = QStackedWidget()
@@ -724,10 +708,10 @@ class MainWindow(QMainWindow):
         filter_row.addWidget(clear_button)
         layout.addLayout(filter_row)
 
-        self.tasks_table = QTableWidget(0, 7)
+        self.tasks_table = QTableWidget(0, 8)
         self.tasks_table.setHorizontalHeaderLabels([
             "Task Name", "Project", "Status", "Priority",
-            "Due Date", "Dependencies", "Actions"
+            "Due Date", "Dependencies", "Dependency Status", "Actions"
         ])
         self.style_table(self.tasks_table)
         layout.addWidget(self.tasks_table, 1)
@@ -836,6 +820,18 @@ class MainWindow(QMainWindow):
                     ))
                 self.do_next_table.setItem(row, col, item)
 
+    def get_blocking_dependencies(self, task):
+        """Return dependency tasks that have not been completed yet."""
+        task_by_id = {item["id"]: item for item in self.tasks}
+        blockers = []
+        for dependency_id in task.get("dependencies", []):
+            dependency = task_by_id.get(dependency_id)
+            if dependency is None:
+                blockers.append(f"Missing task #{dependency_id}")
+            elif dependency["status"] != "Completed":
+                blockers.append(dependency["name"])
+        return blockers
+
     def refresh_tasks_table(self):
         if not hasattr(self, "tasks_table"):
             return
@@ -897,7 +893,17 @@ class MainWindow(QMainWindow):
             actions_layout.addWidget(completion_checkbox, 0, Qt.AlignmentFlag.AlignCenter)
             actions_layout.addWidget(edit_button)
             actions_layout.addWidget(delete_button)
-            self.tasks_table.setCellWidget(row, 6, actions)
+            blockers = self.get_blocking_dependencies(task)
+            blocker_item = QTableWidgetItem("Blocked" if blockers else "—")
+            blocker_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if blockers:
+                blocker_item.setForeground(__import__("PyQt6.QtGui", fromlist=["QColor"]).QColor("#FFFFFF"))
+                blocker_item.setBackground(__import__("PyQt6.QtGui", fromlist=["QColor"]).QColor("#7C3AED"))
+                blocker_item.setToolTip("Blocked: waiting for " + ", ".join(blockers))
+            else:
+                blocker_item.setToolTip("This task has no unfinished dependencies.")
+            self.tasks_table.setItem(row, 6, blocker_item)
+            self.tasks_table.setCellWidget(row, 7, actions)
 
     def set_task_completed(self, task_id, completed):
         task = next((t for t in self.tasks if t["id"] == task_id), None)
@@ -913,12 +919,8 @@ class MainWindow(QMainWindow):
 
     def dependencies_create_cycle(self, task_id, proposed_dependencies):
         """يرجع True لو الاعتماديات الجديدة ستنشئ دورة."""
-        graph = {t["id"]: list(t["dependencies"]) for t in self.tasks}
-        if task_id is not None:
-            graph[task_id] = list(proposed_dependencies)
-        else:
-            # للمهمة الجديدة: لا يوجد ID بعد، لذلك لا يمكن أن تشير إليها مهمة قديمة.
-            return False
+        graph = {t["id"]: list(t.get("dependencies", [])) for t in self.tasks}
+        graph[task_id] = list(proposed_dependencies)
 
         visiting = set()
         visited = set()
@@ -958,6 +960,12 @@ class MainWindow(QMainWindow):
             data["id"] = self.next_id
             self.next_id += 1
             data["dependencies"] = [d for d in data["dependencies"] if d != data["id"]]
+            if self.dependencies_create_cycle(data["id"], data["dependencies"]):
+                QMessageBox.warning(
+                    self, "Invalid dependencies",
+                    "These dependencies create a cycle. Please choose another dependency."
+                )
+                return
             self.tasks.append(data)
             self.refresh_all()
 
