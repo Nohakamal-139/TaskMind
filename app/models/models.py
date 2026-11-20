@@ -40,3 +40,4 @@ class StatusHistory:
     changed_at: str
     old_status: Optional[str] = None
     id: Optional[int] = None
+
