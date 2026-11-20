@@ -1,27 +1,15 @@
-from PyQt6.QtCore import Qt, QDate, pyqtSignal
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import (
-    QAbstractItemView,
-    QCheckBox,
-    QComboBox,
-    QDateEdit,
-    QDialog,
-    QFormLayout,
-    QHBoxLayout,
-    QHeaderView,
-    QLabel,
-    QLineEdit,
-    QListWidget,
-    QListWidgetItem,
-    QMessageBox,
-    QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
+from datetime import date
+from PySide6.QtCore import Qt, QDate , Signal as pyqtSignal
+from PySide6.QtGui import QColor, QFont
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QFrame, QLabel, QPushButton,
+    QVBoxLayout, QHBoxLayout, QGridLayout, QStackedWidget, QTableWidget,
+    QTableWidgetItem, QHeaderView, QLineEdit, QComboBox, QDialog,
+    QFormLayout, QDateEdit, QListWidget, QListWidgetItem, QMessageBox,
+    QCheckBox, QAbstractItemView
 )
 
-from app.services.mock_data_service import load_mock_data
+from app.services.task_service import TaskService
 
 
 STATUS_COLORS = {
@@ -42,7 +30,6 @@ BLOCKED_COLOR = "#7C3AED"
 
 
 class TaskFormDialog(QDialog):
-    """نافذة إضافة أو تعديل مهمة واختيار اعتمادياتها."""
 
     def __init__(self, projects, tasks, current_task=None, parent=None):
         super().__init__(parent)
@@ -175,7 +162,6 @@ class TaskFormDialog(QDialog):
 
 
 class ProjectsTasksScreen(QWidget):
-    """الشاشة الثانية: جدول المهام والبحث والفلاتر والإجراءات."""
 
     tasks_changed = pyqtSignal(list)
 
@@ -476,7 +462,6 @@ class ProjectsTasksScreen(QWidget):
             self.tasks_table.setCellWidget(row, 7, actions)
 
     def dependencies_create_cycle(self, task_id, proposed_dependencies):
-        """يتحقق إذا كانت الاعتماديات الجديدة ستنشئ دورة."""
         graph = {
             task["id"]: list(task.get("dependencies", []))
             for task in self.tasks

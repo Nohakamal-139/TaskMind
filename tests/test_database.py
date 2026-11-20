@@ -160,3 +160,4 @@ def test_transaction_rolls_back_everything_on_error(conn):
             make_task(conn, pid, "Valid task")        # would be saved...
             make_task(conn, pid, "Bad task", importance=9)   # ...but this fails
     assert conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 0
+

@@ -240,3 +240,4 @@ class SettingsRepository:
                ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
             (key, value),
         )
+

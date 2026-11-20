@@ -19,3 +19,4 @@ def create(task_a: int, depends_on_b: int, deps: Dict[int, List[int]])->bool:
     return detect_cycle(task_a, depends_on_b, deps) is not None
 
 
+

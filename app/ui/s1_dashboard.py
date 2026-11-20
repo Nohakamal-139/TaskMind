@@ -1,17 +1,11 @@
 from datetime import date, timedelta
 
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import (
-    QAbstractItemView,
-    QFrame,
-    QGridLayout,
-    QHBoxLayout,
-    QHeaderView,
-    QLabel,
-    QTableWidget,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
+from PySide6.QtCore import Qt, QDate
+from PySide6.QtGui import QColor, QFont
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
+    QFrame, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
+    QAbstractItemView
 )
 
 

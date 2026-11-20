@@ -149,3 +149,4 @@ def seed(db_path=DEFAULT_DB_PATH, today: date | None = None, rng_seed: int = 42)
 
 if __name__ == "__main__":
     seed()
+

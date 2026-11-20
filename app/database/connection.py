@@ -48,3 +48,4 @@ def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
         raise
     else:
         conn.commit()
+
